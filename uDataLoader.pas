@@ -3,8 +3,8 @@
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Classes, Vcl.Grids,
-  System.Variants, System.Win.ComObj;
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Classes, System.StrUtils,
+  Vcl.Grids, System.Variants, System.Win.ComObj;
 
 type
   TDataLoader = class
@@ -23,7 +23,7 @@ var
   Buffer: array[0..2] of Byte;
   BytesRead: Integer;
 begin
-  Result := TEncoding.UTF8; // По умолчанию
+  Result := TEncoding.UTF8;
   if not FileExists(FileName) then Exit;
 
   Stream := TFileStream.Create(FileName, fmOpenRead or fmShareDenyNone);
@@ -31,27 +31,26 @@ begin
     BytesRead := Stream.Read(Buffer, 3);
     if (BytesRead >= 3) and (Buffer[0] = $EF) and (Buffer[1] = $BB) and (Buffer[2] = $BF) then
     begin
-      Result := TEncoding.UTF8; // UTF-8 с BOM
+      Result := TEncoding.UTF8;
       Exit;
     end;
     if (BytesRead >= 2) and (Buffer[0] = $FF) and (Buffer[1] = $FE) then
     begin
-      Result := TEncoding.Unicode; // UTF-16 LE
+      Result := TEncoding.Unicode;
       Exit;
     end;
   finally
     Stream.Free;
   end;
 
-  // Если сигнатуры BOM нет, пробуем Windows-1251 (стандартная ведомственная кодировка РФ)
-  // либо системную ANSI кодировку
+  // Если сигнатуры BOM нет, пробуем русскую ведомственную кодировку Windows-1251
   Result := TEncoding.GetEncoding(1251);
 end;
 
 class function TDataLoader.MatchDocumentTokens(const CellValue, TokenList: string): Boolean;
 var
   Target, TrimmedList, Token: string;
-  CommaPos, StartPos: Integer;
+  i: Integer;
 begin
   Target := Trim(LowerCase(CellValue));
   TrimmedList := Trim(LowerCase(TokenList));
@@ -59,20 +58,22 @@ begin
   if TrimmedList = '' then
     Exit(True);
 
-  // Быстрое сканирование без выделения лишних объектов в куче
-  StartPos := 1;
-  while StartPos <= Length(TrimmedList) do
+  // Надежное посимвольное сканирование без выделения памяти в куче
+  Token := '';
+  for i := 1 to Length(TrimmedList) do
   begin
-    CommaPos := PosEx(',', TrimmedList, StartPos);
-    if CommaPos = 0 then
-      CommaPos := Length(TrimmedList) + 1;
-
-    Token := Trim(Copy(TrimmedList, StartPos, CommaPos - StartPos));
-    if (Token <> '') and (Token = Target) then
-      Exit(True);
-
-    StartPos := CommaPos + 1;
+    if TrimmedList[i] = ',' then
+    begin
+      if (Token <> '') and (Token = Target) then
+        Exit(True);
+      Token := '';
+    end
+    else if TrimmedList[i] <> ' ' then
+      Token := Token + TrimmedList[i];
   end;
+
+  if (Token <> '') and (Token = Target) then
+    Exit(True);
 
   Result := False;
 end;
@@ -111,7 +112,7 @@ begin
       totalRows := Lines.Count;
       if totalRows = 0 then Exit(0);
 
-      // Блокируем перерисовку таблицы во время пакетной загрузки
+      // Блокируем перерисовку таблицы во время пакетной загрузки для максимальной скорости
       Grid.Perform(WM_SETREDRAW, 0, 0);
       try
         Grid.RowCount := totalRows;
