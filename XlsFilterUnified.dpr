@@ -1,4 +1,10 @@
-program XlsFilterUnified;
+п»їprogram XlsFilterUnified;
+
+{$IFDEF WIN32}
+  // РћР±РµСЃРїРµС‡РёРІР°РµС‚ Р·Р°РїСѓСЃРє РЅР° Windows XP (5.1), Vista (6.0), 7 (6.1), 8, 10 Рё 11
+  {$SETPEOSVERSION 5.1}
+  {$SETPESUBSYSVERSION 5.1}
+{$ENDIF}
 
 uses
   Vcl.Forms,
@@ -10,7 +16,7 @@ uses
 begin
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
-  Application.Title := 'Единый фильтр уголовных дел ИЦ МВД';
+  Application.Title := 'Р•РґРёРЅС‹Р№ С„РёР»СЊС‚СЂ СѓРіРѕР»РѕРІРЅС‹С… РґРµР» РР¦ РњР’Р”';
   Application.CreateForm(TfmMain, fmMain);
   Application.Run;
 end.

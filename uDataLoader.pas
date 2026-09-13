@@ -1,12 +1,15 @@
-unit uDataLoader;
+﻿unit uDataLoader;
 
 interface
 
 uses
-  System.SysUtils, System.Classes, Vcl.Grids, System.Variants, System.Win.ComObj;
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Classes, Vcl.Grids,
+  System.Variants, System.Win.ComObj;
 
 type
   TDataLoader = class
+  private
+    class function DetectFileEncoding(const FileName: string): TEncoding;
   public
     class function LoadTable(const FileName: string; Grid: TStringGrid; ProgressBarProc: TProc<Integer, Integer>): Integer;
     class function MatchDocumentTokens(const CellValue, TokenList: string): Boolean;
@@ -14,34 +17,64 @@ type
 
 implementation
 
-class function TDataLoader.MatchDocumentTokens(const CellValue, TokenList: string): Boolean;
+class function TDataLoader.DetectFileEncoding(const FileName: string): TEncoding;
 var
-  Tokens: TStringList;
-  i: Integer;
-  val, target: string;
+  Stream: TFileStream;
+  Buffer: array[0..2] of Byte;
+  BytesRead: Integer;
 begin
-  target := Trim(LowerCase(CellValue));
-  if Trim(TokenList) = '' then
-    Exit(True);
+  Result := TEncoding.UTF8; // По умолчанию
+  if not FileExists(FileName) then Exit;
 
-  Result := False;
-  Tokens := TStringList.Create;
+  Stream := TFileStream.Create(FileName, fmOpenRead or fmShareDenyNone);
   try
-    Tokens.Delimiter := ',';
-    Tokens.StrictDelimiter := True;
-    Tokens.DelimitedText := TokenList;
-    for i := 0 to Tokens.Count - 1 do
+    BytesRead := Stream.Read(Buffer, 3);
+    if (BytesRead >= 3) and (Buffer[0] = $EF) and (Buffer[1] = $BB) and (Buffer[2] = $BF) then
     begin
-      val := Trim(LowerCase(Tokens[i]));
-      if (val <> '') and (target = val) then
-      begin
-        Result := True;
-        Break;
-      end;
+      Result := TEncoding.UTF8; // UTF-8 с BOM
+      Exit;
+    end;
+    if (BytesRead >= 2) and (Buffer[0] = $FF) and (Buffer[1] = $FE) then
+    begin
+      Result := TEncoding.Unicode; // UTF-16 LE
+      Exit;
     end;
   finally
-    Tokens.Free;
+    Stream.Free;
   end;
+
+  // Если сигнатуры BOM нет, пробуем Windows-1251 (стандартная ведомственная кодировка РФ)
+  // либо системную ANSI кодировку
+  Result := TEncoding.GetEncoding(1251);
+end;
+
+class function TDataLoader.MatchDocumentTokens(const CellValue, TokenList: string): Boolean;
+var
+  Target, TrimmedList, Token: string;
+  CommaPos, StartPos: Integer;
+begin
+  Target := Trim(LowerCase(CellValue));
+  TrimmedList := Trim(LowerCase(TokenList));
+
+  if TrimmedList = '' then
+    Exit(True);
+
+  // Быстрое сканирование без выделения лишних объектов в куче
+  StartPos := 1;
+  while StartPos <= Length(TrimmedList) do
+  begin
+    CommaPos := PosEx(',', TrimmedList, StartPos);
+    if CommaPos = 0 then
+      CommaPos := Length(TrimmedList) + 1;
+
+    Token := Trim(Copy(TrimmedList, StartPos, CommaPos - StartPos));
+    if (Token <> '') and (Token = Target) then
+      Exit(True);
+
+    StartPos := CommaPos + 1;
+  end;
+
+  Result := False;
 end;
 
 class function TDataLoader.LoadTable(const FileName: string; Grid: TStringGrid; ProgressBarProc: TProc<Integer, Integer>): Integer;
@@ -51,12 +84,13 @@ var
   j, i, totalRows: Integer;
   ExlApp, Sheet: OLEVariant;
   r, c: Integer;
+  Enc: TEncoding;
 begin
   Result := 0;
   if not FileExists(FileName) then
-    raise Exception.Create('���� �� ������: ' + FileName);
+    raise Exception.Create('Файл не найден: ' + FileName);
 
-  // 1. ��������� CSV ������ ��� ������� CSV �����
+  // 1. Проверяем наличие CSV файла или готовой выгрузки
   CsvFile := FileName;
   if not SameText(ExtractFileExt(FileName), '.csv') then
   begin
@@ -70,28 +104,38 @@ begin
     Row := TStringList.Create;
     Row.Delimiter := ';';
     Row.StrictDelimiter := True;
+    Enc := DetectFileEncoding(CsvFile);
+
     try
-      Lines.LoadFromFile(CsvFile, TEncoding.UTF8);
+      Lines.LoadFromFile(CsvFile, Enc);
       totalRows := Lines.Count;
       if totalRows = 0 then Exit(0);
 
-      Grid.RowCount := totalRows;
-      Row.DelimitedText := Lines[0];
-      Grid.ColCount := Row.Count;
+      // Блокируем перерисовку таблицы во время пакетной загрузки
+      Grid.Perform(WM_SETREDRAW, 0, 0);
+      try
+        Grid.RowCount := totalRows;
+        Row.DelimitedText := Lines[0];
+        Grid.ColCount := Row.Count;
 
-      for j := 0 to totalRows - 1 do
-      begin
-        if Trim(Lines[j]) = '' then Continue;
-        Row.DelimitedText := Lines[j];
-        for i := 0 to Row.Count - 1 do
+        for j := 0 to totalRows - 1 do
         begin
-          if i < Grid.ColCount then
-            Grid.Cells[i, j] := Row[i];
-        end;
+          if Trim(Lines[j]) = '' then Continue;
+          Row.DelimitedText := Lines[j];
+          for i := 0 to Row.Count - 1 do
+          begin
+            if i < Grid.ColCount then
+              Grid.Cells[i, j] := Row[i];
+          end;
 
-        if Assigned(ProgressBarProc) and (j mod 500 = 0) then
-          ProgressBarProc(j, totalRows);
+          if Assigned(ProgressBarProc) and (j mod 1000 = 0) then
+            ProgressBarProc(j, totalRows);
+        end;
+      finally
+        Grid.Perform(WM_SETREDRAW, 1, 0);
+        Grid.Invalidate;
       end;
+
       Result := totalRows - 1;
       Exit;
     finally
@@ -100,38 +144,48 @@ begin
     end;
   end;
 
-  // 2. ���� CSV ���, ������ ����� OLE Excel (���� ����������)
+  // 2. Если CSV не найден, используем OLE Automation Excel (при наличии)
   try
     ExlApp := CreateOleObject('Excel.Application');
   except
     on E: Exception do
-      raise Exception.Create('Microsoft Excel �� ����������, � ���� .csv �� ������ �����.'#13#10 +
-                             '����������, ������������� ���� � CSV ��� ����������� ���� .csv!');
+      raise Exception.Create('Microsoft Excel не установлен, а файл CSV не найден рядом с таблицей.'#13#10 +
+        'Пожалуйста, используйте файл формата .csv или установите Excel.');
   end;
 
   try
-    ExlApp.Visible := False;
     ExlApp.Workbooks.Open(FileName);
-    Sheet := ExlApp.Workbooks[ExtractFileName(FileName)].WorkSheets[1];
-    r := Sheet.UsedRange.Rows.Count;
-    c := Sheet.UsedRange.Columns.Count;
+    Sheet := ExlApp.Workbooks[1].WorkSheets[1];
+    r := 1;
+    while VarToStr(Sheet.Cells[r, 1].Value) <> '' do
+      Inc(r);
 
-    Grid.RowCount := r;
-    Grid.ColCount := c;
+    totalRows := r - 1;
+    Grid.Perform(WM_SETREDRAW, 0, 0);
+    try
+      Grid.RowCount := totalRows;
+      Grid.ColCount := 10;
 
-    for j := 1 to r do
-    begin
-      for i := 1 to c do
-        Grid.Cells[i - 1, j - 1] := VarToStr(Sheet.Cells[j, i]);
+      for j := 1 to totalRows do
+      begin
+        for c := 1 to 10 do
+          Grid.Cells[c - 1, j - 1] := VarToStr(Sheet.Cells[j, c].Value);
 
-      if Assigned(ProgressBarProc) and (j mod 500 = 0) then
-        ProgressBarProc(j, r);
+        if Assigned(ProgressBarProc) and (j mod 500 = 0) then
+          ProgressBarProc(j, totalRows);
+      end;
+    finally
+      Grid.Perform(WM_SETREDRAW, 1, 0);
+      Grid.Invalidate;
     end;
-    Result := r - 1;
+
+    Result := totalRows - 1;
   finally
-    ExlApp.Quit;
+    try
+      ExlApp.Quit;
+    except
+    end;
     ExlApp := Unassigned;
-    Sheet := Unassigned;
   end;
 end;
 
