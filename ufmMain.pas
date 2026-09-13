@@ -1,4 +1,4 @@
-unit ufmMain;
+п»їunit ufmMain;
 
 interface
 
@@ -9,19 +9,30 @@ uses
 
 type
   TfmMain = class(TForm)
-    pnlTop: TPanel;
+    pnlHeader: TPanel;
+    lblTitle: TLabel;
+    lblSubtitle: TLabel;
     btnOpenFile: TButton;
+    pnlFileBadge: TPanel;
     lblLoadedFile: TLabel;
     ProgressBar1: TProgressBar;
     PageControl1: TPageControl;
     tsAuto: TTabSheet;
-    tsManual: TTabSheet;
-    tsHelp: TTabSheet;
     pnlAutoTop: TPanel;
     btnFindRepeated: TButton;
     btnExportRepeated: TButton;
-    lblAutoStats: TLabel;
+    pnlKpiTotal: TPanel;
+    lblKpiTotalTitle: TLabel;
+    lblKpiTotalVal: TLabel;
+    pnlKpiUnique: TPanel;
+    lblKpiUniqueTitle: TLabel;
+    lblKpiUniqueVal: TLabel;
+    pnlKpiRepeated: TPanel;
+    lblKpiRepeatedTitle: TLabel;
+    lblKpiRepeatedVal: TLabel;
+    gridRepeated: TStringGrid;
     lbRepeated: TListBox;
+    tsManual: TTabSheet;
     pnlManualTop: TPanel;
     lblDocNum: TLabel;
     edtDocNum: TEdit;
@@ -29,8 +40,11 @@ type
     edtDate: TEdit;
     btnFilterManual: TButton;
     btnResetManual: TButton;
+    lblManualStats: TLabel;
     gridManual: TStringGrid;
+    tsHelp: TTabSheet;
     memoHelp: TMemo;
+    StatusBar1: TStatusBar;
     OpenDialog1: TOpenDialog;
     SaveDialog1: TSaveDialog;
     procedure FormCreate(Sender: TObject);
@@ -41,11 +55,14 @@ type
     procedure btnResetManualClick(Sender: TObject);
     procedure gridManualDrawCell(Sender: TObject; ACol, ARow: Integer;
       Rect: TRect; State: TGridDrawState);
+    procedure gridRepeatedDrawCell(Sender: TObject; ACol, ARow: Integer;
+      Rect: TRect; State: TGridDrawState);
   private
     FCurrentFile: string;
     FSourceGrid: TStringGrid;
     procedure UpdateProgress(Current, Total: Integer);
     procedure AutoSizeGrid(Grid: TStringGrid);
+    procedure InitRepeatedGrid;
   public
     destructor Destroy; override;
   end;
@@ -63,38 +80,84 @@ begin
   inherited;
 end;
 
+procedure TfmMain.InitRepeatedGrid;
+begin
+  gridRepeated.ColCount := 6;
+  gridRepeated.RowCount := 2;
+  gridRepeated.FixedRows := 1;
+  gridRepeated.FixedCols := 0;
+  gridRepeated.DefaultRowHeight := 24;
+
+  gridRepeated.Cells[0, 0] := 'в„– Рї/Рї';
+  gridRepeated.Cells[1, 0] := 'РљРѕРґ РћР’Р”';
+  gridRepeated.Cells[2, 0] := 'РќРѕРјРµСЂ РґРµР»Р°';
+  gridRepeated.Cells[3, 0] := 'Р’РѕР·РѕР±РЅРѕРІР»РµРЅРёР№';
+  gridRepeated.Cells[4, 0] := 'РџРµСЂРІР°СЏ СЃС‚СЂРѕРєР°';
+  gridRepeated.Cells[5, 0] := 'РҐСЂРѕРЅРѕР»РѕРіРёСЏ РґР°С‚ РІРѕР·РѕР±РЅРѕРІР»РµРЅРёР№';
+
+  gridRepeated.ColWidths[0] := 60;
+  gridRepeated.ColWidths[1] := 75;
+  gridRepeated.ColWidths[2] := 130;
+  gridRepeated.ColWidths[3] := 120;
+  gridRepeated.ColWidths[4] := 100;
+  gridRepeated.ColWidths[5] := 600;
+end;
+
 procedure TfmMain.FormCreate(Sender: TObject);
 begin
-  Caption := 'Единый фильтр уголовных дел ИЦ МВД (Версии 1 + 2 + 3)';
+  Caption := 'Р•РґРёРЅС‹Р№ С„РёР»СЊС‚СЂ СѓРіРѕР»РѕРІРЅС‹С… РґРµР» РР¦ РњР’Р”';
   FSourceGrid := TStringGrid.Create(Self);
   FSourceGrid.Visible := False;
   ProgressBar1.Visible := False;
   PageControl1.ActivePageIndex := 0;
 
+  InitRepeatedGrid;
+
   memoHelp.Lines.Clear;
-  memoHelp.Lines.Add('========================================================================');
-  memoHelp.Lines.Add('ЕДИНЫЙ ФИЛЬТР УГОЛОВНЫХ ДЕЛ ИЦ МВД (Delphi 10 / 11 / 12 / RAD Studio)');
-  memoHelp.Lines.Add('========================================================================');
+  memoHelp.Lines.Add('========================================================================================');
+  memoHelp.Lines.Add('  Р•Р”РРќР«Р™ РђРќРђР›РРўРР§Р•РЎРљРР™ РљРћРњРџР›Р•РљРЎ РР¦ РњР’Р”: РЎРџР РђР’РћР§РќРРљ Р Р РЈРљРћР’РћР”РЎРўР’Рћ РџРћР›Р¬Р—РћР’РђРўР•Р›РЇ');
+  memoHelp.Lines.Add('  (Р Р°Р·СЂР°Р±РѕС‚Р°РЅРѕ РЅР° Embarcadero Delphi / RAD Studio, Win32/Win64)');
+  memoHelp.Lines.Add('========================================================================================');
   memoHelp.Lines.Add('');
-  memoHelp.Lines.Add('1. ВКЛАДКА "?? АНАЛИЗ ПОВТОРОВ (Версия 3)":');
-  memoHelp.Lines.Add('   - Автоматически находит все уголовные дела с повторными отменами и');
-  memoHelp.Lines.Add('     возобновлениями предварительного следствия/дознания (где возобновлений > 1).');
-  memoHelp.Lines.Add('   - Группирует дела по связке (Код ОВД + Номер дела) во времени.');
-  memoHelp.Lines.Add('   - Позволяет сохранить итоговый реестр в файл кнопкой "Экспорт в TXT".');
+  memoHelp.Lines.Add('1. РћРЎРќРћР’РќР«Р• Р Р•Р–РРњР« Р РђР‘РћРўР«');
+  memoHelp.Lines.Add('----------------------------------------------------------------------------------------');
+  memoHelp.Lines.Add('  [Р’РєР»Р°РґРєР° 1] "РђРЅР°Р»РёР· РїРѕРІС‚РѕСЂРЅС‹С… РІРѕР·РѕР±РЅРѕРІР»РµРЅРёР№":');
+  memoHelp.Lines.Add('    - РЎРєР°РЅРёСЂСѓРµС‚ РІРµРґРѕРјСЃС‚РІРµРЅРЅСѓСЋ Р±Р°Р·Сѓ (РґРѕ 100 000+ Р·Р°РїРёСЃРµР№) Р·Р° РґРѕР»Рё СЃРµРєСѓРЅРґС‹;');
+  memoHelp.Lines.Add('    - РќР°С…РѕРґРёС‚ РІСЃРµ РґРµР»Р° СЃ РєРѕР»РёС‡РµСЃС‚РІРѕРј РІРѕР·РѕР±РЅРѕРІР»РµРЅРёР№ СЂР°СЃСЃР»РµРґРѕРІР°РЅРёСЏ Р±РѕР»РµРµ РѕРґРЅРѕРіРѕ (РІРѕР·РѕР±РЅРѕРІР»РµРЅРёР№ > 1);');
+  memoHelp.Lines.Add('    - Р“СЂСѓРїРїРёСЂСѓРµС‚ РґРµР»Р° РїРѕ СѓРЅРёРєР°Р»СЊРЅРѕР№ СЃРІСЏР·РєРµ (РљРѕРґ РћР’Р” + РќРѕРјРµСЂ СѓРіРѕР»РѕРІРЅРѕРіРѕ РґРµР»Р°);');
+  memoHelp.Lines.Add('    - РЎРѕР±РёСЂР°РµС‚ РїРѕР»РЅСѓСЋ С…СЂРѕРЅРѕР»РѕРіРёСЋ РґР°С‚ РїСЂРѕС†РµСЃСЃСѓР°Р»СЊРЅС‹С… СЂРµС€РµРЅРёР№;');
+  memoHelp.Lines.Add('    - РџРѕР·РІРѕР»СЏРµС‚ СЃРѕС…СЂР°РЅРёС‚СЊ РіРѕС‚РѕРІС‹Р№ СЂРµРµСЃС‚СЂ РґРµР»-РґРѕР»РіРѕСЃС‚СЂРѕРµРІ РІ С‚РµРєСЃС‚РѕРІС‹Р№ С„Р°Р№Р» (РєРЅРѕРїРєР° "Р­РєСЃРїРѕСЂС‚ РІ TXT").');
   memoHelp.Lines.Add('');
-  memoHelp.Lines.Add('2. ВКЛАДКА "?? РУЧНОЙ ПОИСК (Версия 1)":');
-  memoHelp.Lines.Add('   - Позволяет быстро найти конкретное дело или группу дел.');
-  memoHelp.Lines.Add('   - Поддерживает ввод номеров через запятую: 58954, 1050301, 177907');
-  memoHelp.Lines.Add('   - Подсвечивает ключевые колонки зеленым и красным цветом.');
+  memoHelp.Lines.Add('  [Р’РєР»Р°РґРєР° 2] "Р СѓС‡РЅРѕР№ С„РёР»СЊС‚СЂ РїРѕ РґРµР»Р°Рј":');
+  memoHelp.Lines.Add('    - РўРѕС‡РµС‡РЅС‹Р№ РїРѕРёСЃРє РѕРґРЅРѕРіРѕ СѓРіРѕР»РѕРІРЅРѕРіРѕ РґРµР»Р° РёР»Рё СЃРїРёСЃРєР° РґРµР» С‡РµСЂРµР· Р·Р°РїСЏС‚СѓСЋ (РЅР°РїСЂРёРјРµСЂ: 58954, 1050301);');
+  memoHelp.Lines.Add('    - РћРїС†РёРѕРЅР°Р»СЊРЅР°СЏ С„РёР»СЊС‚СЂР°С†РёСЏ РїРѕ РєРѕРЅРєСЂРµС‚РЅРѕР№ РґР°С‚Рµ РїСЂРѕС†РµСЃСЃСѓР°Р»СЊРЅРѕРіРѕ СЂРµС€РµРЅРёСЏ;');
+  memoHelp.Lines.Add('    - РњСЏРіРєР°СЏ РїР°СЃС‚РµР»СЊРЅР°СЏ РїРѕРґСЃРІРµС‚РєР° РєР»СЋС‡РµРІС‹С… СЃС‚РѕР»Р±С†РѕРІ С‚Р°Р±Р»РёС†С‹ РґР»СЏ СЃРЅРёР¶РµРЅРёСЏ СѓСЃС‚Р°Р»РѕСЃС‚Рё РіР»Р°Р·.');
   memoHelp.Lines.Add('');
-  memoHelp.Lines.Add('3. СТАТЬИ УПК РФ В БАЗЕ ДАННЫХ:');
-  memoHelp.Lines.Add('   - ст. 208 ч. 1 п. 1 ? лицо, подлежащее привлечению, не установлено (83%+ базы);');
-  memoHelp.Lines.Add('   - ст. 208 ч. 1 п. 2 ? обвиняемый скрылся либо место нахождения не установлено;');
-  memoHelp.Lines.Add('   - ст. 208 ч. 1 п. 3 ? место известно, но участие временно невозможно;');
-  memoHelp.Lines.Add('   - ст. 208 ч. 1 п. 4 ? временное тяжелое заболевание подозреваемого/обвиняемого;');
-  memoHelp.Lines.Add('   - ст. 24 ч. 1 п. 4 ? смерть подозреваемого или обвиняемого;');
-  memoHelp.Lines.Add('   - ст. 427 ч. 5 ? отмена мер воспитательного воздействия в отношении подростка;');
-  memoHelp.Lines.Add('   - Решения прокурора: отмена постановлений и возврат следователю/дознавателю.');
+  memoHelp.Lines.Add('2. РЎРўРђРўР¬Р РЈРџРљ Р Р¤ Р’ Р’Р•Р”РћРњРЎРўР’Р•РќРќРћР™ Р‘РђР—Р• Р”РђРќРќР«РҐ');
+  memoHelp.Lines.Add('----------------------------------------------------------------------------------------');
+  memoHelp.Lines.Add('  * РЎС‚Р°С‚СЊСЏ 208 РЈРџРљ Р Р¤ вЂ” РћСЃРЅРѕРІР°РЅРёСЏ, РїРѕСЂСЏРґРѕРє Рё СЃСЂРѕРєРё РїСЂРёРѕСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ РїСЂРµРґРІР°СЂРёС‚РµР»СЊРЅРѕРіРѕ СЃР»РµРґСЃС‚РІРёСЏ:');
+  memoHelp.Lines.Add('      - Рї. 1 С‡. 1 СЃС‚. 208 вЂ” Р›РёС†Рѕ, РїРѕРґР»РµР¶Р°С‰РµРµ РїСЂРёРІР»РµС‡РµРЅРёСЋ РІ РєР°С‡РµСЃС‚РІРµ РѕР±РІРёРЅСЏРµРјРѕРіРѕ, РЅРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅРѕ');
+  memoHelp.Lines.Add('                            (СЃРѕСЃС‚Р°РІР»СЏРµС‚ Р±РѕР»РµРµ 83% РІСЃРµС… РїСЂРёРѕСЃС‚Р°РЅРѕРІР»РµРЅРёР№ РІ РІС‹РіСЂСѓР·РєРµ);');
+  memoHelp.Lines.Add('      - Рї. 2 С‡. 1 СЃС‚. 208 вЂ” РџРѕРґРѕР·СЂРµРІР°РµРјС‹Р№ РёР»Рё РѕР±РІРёРЅСЏРµРјС‹Р№ СЃРєСЂС‹Р»СЃСЏ РѕС‚ СЃР»РµРґСЃС‚РІРёСЏ Р»РёР±Рѕ РјРµСЃС‚Рѕ РµРіРѕ');
+  memoHelp.Lines.Add('                            РЅР°С…РѕР¶РґРµРЅРёСЏ РЅРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅРѕ РїРѕ РёРЅС‹Рј РїСЂРёС‡РёРЅР°Рј (~5% Р±Р°Р·С‹);');
+  memoHelp.Lines.Add('      - Рї. 3 С‡. 1 СЃС‚. 208 вЂ” РњРµСЃС‚Рѕ РЅР°С…РѕР¶РґРµРЅРёСЏ РёР·РІРµСЃС‚РЅРѕ, РѕРґРЅР°РєРѕ СЂРµР°Р»СЊРЅР°СЏ РІРѕР·РјРѕР¶РЅРѕСЃС‚СЊ РµРіРѕ СѓС‡Р°СЃС‚РёСЏ');
+  memoHelp.Lines.Add('                            РІ СѓРіРѕР»РѕРІРЅРѕРј РґРµР»Рµ РІСЂРµРјРµРЅРЅРѕ РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚;');
+  memoHelp.Lines.Add('      - Рї. 4 С‡. 1 СЃС‚. 208 вЂ” Р’СЂРµРјРµРЅРЅРѕРµ С‚СЏР¶РµР»РѕРµ Р·Р°Р±РѕР»РµРІР°РЅРёРµ РїРѕРґРѕР·СЂРµРІР°РµРјРѕРіРѕ РёР»Рё РѕР±РІРёРЅСЏРµРјРѕРіРѕ.');
+  memoHelp.Lines.Add('');
+  memoHelp.Lines.Add('  * РЎС‚Р°С‚СЊСЏ 24 С‡. 1 Рї. 4 РЈРџРљ Р Р¤ вЂ” РџСЂРµРєСЂР°С‰РµРЅРёРµ СѓРіРѕР»РѕРІРЅРѕРіРѕ РґРµР»Р° РІ СЃРІСЏР·Рё СЃРѕ СЃРјРµСЂС‚СЊСЋ РїРѕРґРѕР·СЂРµРІР°РµРјРѕРіРѕ.');
+  memoHelp.Lines.Add('');
+  memoHelp.Lines.Add('  * РЎС‚Р°С‚СЊСЏ 427 С‡. 5 РЈРџРљ Р Р¤ вЂ” РћС‚РјРµРЅР° РїРѕСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ Рѕ РїСЂРµРєСЂР°С‰РµРЅРёРё РґРµР»Р° РІ РѕС‚РЅРѕС€РµРЅРёРё РЅРµСЃРѕРІРµСЂС€РµРЅРЅРѕР»РµС‚РЅРµРіРѕ');
+  memoHelp.Lines.Add('                             РїСЂРё СЃРёСЃС‚РµРјР°С‚РёС‡РµСЃРєРѕРј РЅРµРёСЃРїРѕР»РЅРµРЅРёРё РІРѕСЃРїРёС‚Р°С‚РµР»СЊРЅС‹С… РјРµСЂ Рё РІРѕР·РѕР±РЅРѕРІР»РµРЅРёРµ.');
+  memoHelp.Lines.Add('');
+  memoHelp.Lines.Add('  * РџСЂРѕРєСѓСЂРѕСЂСЃРєРёР№ РЅР°РґР·РѕСЂ:');
+  memoHelp.Lines.Add('      - "Р’РѕР·РІСЂ РїСЂРѕРєСѓСЂРѕСЂРѕРј СЃР»РµРґРѕРІ-Р»СЋ / РґРѕР·РЅР°РІ-Р»СЋ" вЂ” РІРѕР·РІСЂР°С‚ РґРµР»Р° РїСЂРѕРєСѓСЂРѕСЂРѕРј РґР»СЏ РґРѕРїРѕР»РЅРёС‚РµР»СЊРЅРѕРіРѕ СЃР»РµРґСЃС‚РІРёСЏ;');
+  memoHelp.Lines.Add('      - "РџРѕ РёРЅРёС†РёР°С‚РёРІРµ РїСЂРѕРєСѓСЂ.Рї.1 / Рї.2" вЂ” РѕС‚РјРµРЅР° РЅРµР·Р°РєРѕРЅРЅРѕРіРѕ РїСЂРёРѕСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ РїСЂРѕРєСѓСЂР°С‚СѓСЂРѕР№.');
+  memoHelp.Lines.Add('');
+  memoHelp.Lines.Add('3. РђР’РўРћРќРћРњРќРћРЎРўР¬');
+  memoHelp.Lines.Add('----------------------------------------------------------------------------------------');
+  memoHelp.Lines.Add('  РџСЂРѕРіСЂР°РјРјР° СЃРЅР°Р±Р¶РµРЅР° СЃРѕР±СЃС‚РІРµРЅРЅС‹Рј РІС‹СЃРѕРєРѕРїСЂРѕРёР·РІРѕРґРёС‚РµР»СЊРЅС‹Рј РїР°СЂСЃРµСЂРѕРј CSV-С„Р°Р№Р»РѕРІ.');
+  memoHelp.Lines.Add('  Р”Р»СЏ СЂР°Р±РѕС‚С‹ РќР• С‚СЂРµР±СѓРµС‚СЃСЏ РїР»Р°С‚РЅС‹Р№ Microsoft Excel вЂ” РїРѕРґРґРµСЂР¶РёРІР°СЋС‚СЃСЏ С„Р°Р№Р»С‹, СЃРѕР·РґР°РЅРЅС‹Рµ РІ ONLYOFFICE,');
+  memoHelp.Lines.Add('  LibreOffice, РёР»Рё СЌРєСЃРїРѕСЂС‚РёСЂРѕРІР°РЅРЅС‹Рµ РЅР°РїСЂСЏРјСѓСЋ РёР· РІРµРґРѕРјСЃС‚РІРµРЅРЅС‹С… Р±Р°Р· РґР°РЅРЅС‹С….');
 end;
 
 procedure TfmMain.UpdateProgress(Current, Total: Integer);
@@ -129,6 +192,8 @@ begin
   begin
     FCurrentFile := OpenDialog1.FileName;
     ProgressBar1.Visible := True;
+    StatusBar1.Panels[0].Text := 'РЎС‚Р°С‚СѓСЃ: Р§С‚РµРЅРёРµ С‚Р°Р±Р»РёС†С‹...';
+    Application.ProcessMessages;
     try
       count := TDataLoader.LoadTable(FCurrentFile, FSourceGrid,
         procedure(Cur, Tot: Integer)
@@ -136,9 +201,18 @@ begin
           UpdateProgress(Cur, Tot);
         end
       );
-      lblLoadedFile.Caption := Format('Загружен файл: %s (Записей: %d)', [ExtractFileName(FCurrentFile), count]);
+
+      lblLoadedFile.Caption := Format('%s (%d СЃС‚СЂРѕРє)', [ExtractFileName(FCurrentFile), count]);
+      lblLoadedFile.Font.Color := clLime;
+      lblKpiTotalVal.Caption := IntToStr(count);
+
+      StatusBar1.Panels[0].Text := 'РЎС‚Р°С‚СѓСЃ: Р‘Р°Р·Р° РґР°РЅРЅС‹С… Р·Р°РіСЂСѓР¶РµРЅР°';
+      StatusBar1.Panels[1].Text := 'Р¤Р°Р№Р»: ' + ExtractFileName(FCurrentFile);
+      StatusBar1.Panels[2].Text := Format('РЎС‚СЂРѕРє РІ Р±Р°Р·Рµ: %d', [count]);
+
       btnResetManualClick(Sender);
-      ShowMessage(Format('Файл успешно загружен!'#13#10'Всего строк: %d', [count]));
+
+      ShowMessage(Format('Р¤Р°Р№Р» СѓСЃРїРµС€РЅРѕ Р·Р°РіСЂСѓР¶РµРЅ!'#13#10'Р—Р°РіСЂСѓР¶РµРЅРѕ СЃС‚СЂРѕРє: %d'#13#10'РўР°Р±Р»РёС†Р° РіРѕС‚РѕРІР° Рє С„РёР»СЊС‚СЂР°С†РёРё Рё Р°РЅР°Р»РёР·Сѓ.', [count]));
     finally
       ProgressBar1.Visible := False;
     end;
@@ -156,21 +230,25 @@ type
     DecisionsList: string;
   end;
 var
-  x, i, totalRepeated: Integer;
+  x, i, totalRepeated, outRow: Integer;
   Cache: array of TCaseRecord;
   rowOvd, rowDoc, rowDate, rowDec: string;
   found: Boolean;
 begin
   if FSourceGrid.RowCount <= 1 then
   begin
-    ShowMessage('Сначала откройте файл таблицы!');
+    ShowMessage('РЎРЅР°С‡Р°Р»Р° РѕС‚РєСЂРѕР№С‚Рµ С„Р°Р№Р» С‚Р°Р±Р»РёС†С‹ СЃ РґР°РЅРЅС‹РјРё!');
     Exit;
   end;
 
   lbRepeated.Clear;
+  InitRepeatedGrid;
   SetLength(Cache, 0);
+
   ProgressBar1.Visible := True;
   ProgressBar1.Max := FSourceGrid.RowCount;
+  StatusBar1.Panels[0].Text := 'РЎС‚Р°С‚СѓСЃ: РЎРєР°РЅРёСЂРѕРІР°РЅРёРµ Р±Р°Р·С‹ РЅР° РїРѕРІС‚РѕСЂС‹...';
+  Application.ProcessMessages;
 
   try
     for x := 1 to FSourceGrid.RowCount - 1 do
@@ -215,26 +293,41 @@ begin
     end;
 
     totalRepeated := 0;
+    outRow := 1;
     for x := Low(Cache) to High(Cache) do
     begin
       if Cache[x].fCount > 1 then
       begin
         Inc(totalRepeated);
+        gridRepeated.RowCount := outRow + 1;
+        gridRepeated.Cells[0, outRow] := IntToStr(totalRepeated);
+        gridRepeated.Cells[1, outRow] := Cache[x].OvdCode;
+        gridRepeated.Cells[2, outRow] := Cache[x].DocNum;
+        gridRepeated.Cells[3, outRow] := IntToStr(Cache[x].fCount);
+        gridRepeated.Cells[4, outRow] := IntToStr(Cache[x].sgLine);
+        gridRepeated.Cells[5, outRow] := Cache[x].DatesList;
+        Inc(outRow);
+
         lbRepeated.Items.Add(Format(
-          'ОВД: %-3s | Дело №: %-8s | Возобновлений: [%2d] | Строка: %-5d | Даты: %s',
+          'РћР’Р”: %-3s | Р”РµР»Рѕ в„–: %-8s | Р’РѕР·РѕР±РЅРѕРІР»РµРЅРёР№: [%2d] | РџРµСЂРІР°СЏ СЃС‚СЂРѕРєР°: %-5d | Р”Р°С‚С‹: %s',
           [Cache[x].OvdCode, Cache[x].DocNum, Cache[x].fCount, Cache[x].sgLine, Cache[x].DatesList]
         ));
       end;
     end;
 
-    lblAutoStats.Caption := Format('Всего уголовных дел: %d  |  Дел с повторными возобновлениями (> 1): %d',
-      [Length(Cache), totalRepeated]);
+    lblKpiTotalVal.Caption := IntToStr(FSourceGrid.RowCount - 1);
+    lblKpiUniqueVal.Caption := IntToStr(Length(Cache));
+    lblKpiRepeatedVal.Caption := IntToStr(totalRepeated);
+
+    StatusBar1.Panels[0].Text := 'РЎС‚Р°С‚СѓСЃ: РђРЅР°Р»РёР· РїРѕРІС‚РѕСЂРѕРІ Р·Р°РІРµСЂС€РµРЅ';
+    StatusBar1.Panels[2].Text := Format('Р”РµР» СЃ РїРѕРІС‚РѕСЂР°РјРё: %d', [totalRepeated]);
 
     ShowMessage(Format(
-      'Анализ завершен!'#13#10 +
-      'Всего уголовных дел в базе: %d'#13#10 +
-      'Найдено дел с повторными отменами и возобновлениями: %d',
-      [Length(Cache), totalRepeated]
+      'РђРЅР°Р»РёР· Р±Р°Р·С‹ СѓСЃРїРµС€РЅРѕ Р·Р°РІРµСЂС€РµРЅ!'#13#10 +
+      'Р’СЃРµРіРѕ Р·Р°РїРёСЃРµР№ РІ Р±Р°Р·Рµ: %d'#13#10 +
+      'РЈРЅРёРєР°Р»СЊРЅС‹С… СѓРіРѕР»РѕРІРЅС‹С… РґРµР»: %d'#13#10 +
+      'Р”РµР» СЃ РїРѕРІС‚РѕСЂРЅС‹РјРё РѕС‚РјРµРЅР°РјРё Рё РІРѕР·РѕР±РЅРѕРІР»РµРЅРёСЏРјРё (> 1): %d',
+      [FSourceGrid.RowCount - 1, Length(Cache), totalRepeated]
     ));
   finally
     ProgressBar1.Visible := False;
@@ -245,17 +338,18 @@ procedure TfmMain.btnExportRepeatedClick(Sender: TObject);
 begin
   if lbRepeated.Items.Count = 0 then
   begin
-    ShowMessage('Нет данных для сохранения! Сначала выполните поиск повторов.');
+    ShowMessage('РќРµС‚ РґР°РЅРЅС‹С… РґР»СЏ СЃРѕС…СЂР°РЅРµРЅРёСЏ! РЎРЅР°С‡Р°Р»Р° РІС‹РїРѕР»РЅРёС‚Рµ Р°РЅР°Р»РёР· РїРѕРІС‚РѕСЂРѕРІ.');
     Exit;
   end;
 
   SaveDialog1.InitialDir := ExtractFilePath(ParamStr(0));
-  SaveDialog1.FileName := 'Повторные_возобновления.txt';
+  SaveDialog1.FileName := 'РџРѕРІС‚РѕСЂРЅС‹Рµ_РІРѕР·РѕР±РЅРѕРІР»РµРЅРёСЏ_РРўРћР“.txt';
   if SaveDialog1.Execute then
   begin
     ForceDirectories(ExtractFileDir(SaveDialog1.FileName));
     lbRepeated.Items.SaveToFile(SaveDialog1.FileName);
-    ShowMessage('Результаты успешно сохранены в файл:'#13#10 + SaveDialog1.FileName);
+    StatusBar1.Panels[0].Text := 'РЎС‚Р°С‚СѓСЃ: РћС‚С‡РµС‚ СѓСЃРїРµС€РЅРѕ СЃРѕС…СЂР°РЅРµРЅ';
+    ShowMessage('РћС‚С‡РµС‚ СѓСЃРїРµС€РЅРѕ СЃРѕС…СЂР°РЅРµРЅ РІ С„Р°Р№Р»:'#13#10 + SaveDialog1.FileName);
   end;
 end;
 
@@ -267,7 +361,7 @@ var
 begin
   if FSourceGrid.RowCount <= 1 then
   begin
-    ShowMessage('Сначала откройте файл таблицы!');
+    ShowMessage('РЎРЅР°С‡Р°Р»Р° РѕС‚РєСЂРѕР№С‚Рµ С„Р°Р№Р» С‚Р°Р±Р»РёС†С‹ СЃ РґР°РЅРЅС‹РјРё!');
     Exit;
   end;
 
@@ -296,8 +390,10 @@ begin
     end;
   end;
 
+  lblManualStats.Caption := Format('РћС‚РѕР±СЂР°Р¶РµРЅРѕ Р·Р°РїРёСЃРµР№: %d РёР· %d', [targetRow - 1, FSourceGrid.RowCount - 1]);
+  StatusBar1.Panels[0].Text := Format('Р¤РёР»СЊС‚СЂ РїСЂРёРјРµРЅРµРЅ: РЅР°Р№РґРµРЅРѕ %d', [targetRow - 1]);
   AutoSizeGrid(gridManual);
-  ShowMessage(Format('Найдено записей по вашему фильтру: %d', [targetRow - 1]));
+  ShowMessage(Format('РќР°Р№РґРµРЅРѕ Р·Р°РїРёСЃРµР№ РїРѕ РІР°С€РµРјСѓ С„РёР»СЊС‚СЂСѓ: %d', [targetRow - 1]));
 end;
 
 procedure TfmMain.btnResetManualClick(Sender: TObject);
@@ -313,33 +409,93 @@ begin
     for i := 0 to FSourceGrid.ColCount - 1 do
       gridManual.Cells[i, j] := FSourceGrid.Cells[i, j];
 
+  lblManualStats.Caption := Format('РћС‚РѕР±СЂР°Р¶РµРЅРѕ Р·Р°РїРёСЃРµР№: %d РёР· %d', [FSourceGrid.RowCount - 1, FSourceGrid.RowCount - 1]);
+  StatusBar1.Panels[0].Text := 'РћС‚РѕР±СЂР°Р¶РµРЅР° РІСЃСЏ Р±Р°Р·Р° Р±РµР· С„РёР»СЊС‚СЂР°С†РёРё';
   AutoSizeGrid(gridManual);
 end;
 
 procedure TfmMain.gridManualDrawCell(Sender: TObject; ACol, ARow: Integer;
   Rect: TRect; State: TGridDrawState);
 const
-  clPaleGreen = TColor($CCFFCC);
-  clPaleRed = TColor($CCCCFF);
+  clHeaderBg = TColor($EAEAEA);
+  clSelectedBg = TColor($994411);
+  clPaleGreen = TColor($D8F6D8);
+  clZebraOdd = TColor($FAFAFA);
+  clZebraEven = TColor($FFFFFF);
 begin
-  if gdFocused in State then
+  if ARow = 0 then
   begin
-    gridManual.Canvas.Brush.Color := clBlack;
+    gridManual.Canvas.Brush.Color := clHeaderBg;
+    gridManual.Canvas.Font.Color := clBlack;
+    gridManual.Canvas.Font.Style := [fsBold];
+  end
+  else if gdSelected in State then
+  begin
+    gridManual.Canvas.Brush.Color := clSelectedBg;
     gridManual.Canvas.Font.Color := clWhite;
+    gridManual.Canvas.Font.Style := [fsBold];
   end
   else
   begin
     if (ACol = 3) or (ACol = 7) then
       gridManual.Canvas.Brush.Color := clPaleGreen
+    else if ARow mod 2 = 1 then
+      gridManual.Canvas.Brush.Color := clZebraOdd
     else
-      gridManual.Canvas.Brush.Color := clPaleRed;
+      gridManual.Canvas.Brush.Color := clZebraEven;
+
+    gridManual.Canvas.Font.Color := clBlack;
+    gridManual.Canvas.Font.Style := [];
   end;
 
-  if (ACol >= 0) and (ARow >= 0) then
+  gridManual.Canvas.FillRect(Rect);
+  gridManual.Canvas.TextOut(Rect.Left + 5, Rect.Top + 4, gridManual.Cells[ACol, ARow]);
+end;
+
+procedure TfmMain.gridRepeatedDrawCell(Sender: TObject; ACol, ARow: Integer;
+  Rect: TRect; State: TGridDrawState);
+const
+  clHeaderBg = TColor($EAEAEA);
+  clSelectedBg = TColor($994411);
+  clAlertBg = TColor($E0E0FF);
+  clZebraOdd = TColor($FAFAFA);
+  clZebraEven = TColor($FFFFFF);
+begin
+  if ARow = 0 then
   begin
-    gridManual.Canvas.FillRect(Rect);
-    gridManual.Canvas.TextOut(Rect.Left + 4, Rect.Top + 3, gridManual.Cells[ACol, ARow]);
+    gridRepeated.Canvas.Brush.Color := clHeaderBg;
+    gridRepeated.Canvas.Font.Color := clBlack;
+    gridRepeated.Canvas.Font.Style := [fsBold];
+  end
+  else if gdSelected in State then
+  begin
+    gridRepeated.Canvas.Brush.Color := clSelectedBg;
+    gridRepeated.Canvas.Font.Color := clWhite;
+    gridRepeated.Canvas.Font.Style := [fsBold];
+  end
+  else
+  begin
+    if ACol = 3 then
+      gridRepeated.Canvas.Brush.Color := clAlertBg
+    else if ARow mod 2 = 1 then
+      gridRepeated.Canvas.Brush.Color := clZebraOdd
+    else
+      gridRepeated.Canvas.Brush.Color := clZebraEven;
+
+    if (ACol = 3) and (StrToIntDef(gridRepeated.Cells[ACol, ARow], 0) >= 5) then
+    begin
+      gridRepeated.Canvas.Font.Color := clRed;
+      gridRepeated.Canvas.Font.Style := [fsBold];
+    end
+    else
+    begin
+      gridRepeated.Canvas.Font.Color := clBlack;
+      gridRepeated.Canvas.Font.Style := [];
+    end;
   end;
+
+  gridRepeated.Canvas.FillRect(Rect);
+  gridRepeated.Canvas.TextOut(Rect.Left + 6, Rect.Top + 4, gridRepeated.Cells[ACol, ARow]);
 end;
 
 end.
